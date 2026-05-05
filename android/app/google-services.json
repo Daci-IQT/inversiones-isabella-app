@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "864122983951",
+    "project_id": "inversionesisabellaapp",
+    "storage_bucket": "inversionesisabellaapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864122983951:android:07227472878829c1be357a",
+        "android_client_info": {
+          "package_name": "com.example.inversiones_isabella_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA55RAIu_d2cVZKf2nMltOSOCwQKE8y2MI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
