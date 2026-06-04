@@ -41,6 +41,14 @@ dependencies:
   firebase_storage: ^13.0.0
   image_picker: ^1.0.0
   fl_chart: ^0.68.0
+  carousel_slider: ^5.1.2
+
+  pdf: ^3.11.0
+  printing: ^5.13.4
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
+  share_plus: ^10.1.4
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
