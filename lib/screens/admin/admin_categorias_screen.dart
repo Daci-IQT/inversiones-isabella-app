@@ -237,8 +237,8 @@ class _AdminCategoriasScreenState extends State<AdminCategoriasScreen> {
 
                           leading: CircleAvatar(
                             backgroundColor: activo
-                                ? primaryColor.withOpacity(0.12)
-                                : Colors.grey.withOpacity(0.20),
+                                ? primaryColor.withValues(alpha: 0.12)
+                                : Colors.grey.withValues(alpha: 0.20),
                             child: Icon(
                               activo
                                   ? Icons.category
@@ -271,8 +271,8 @@ class _AdminCategoriasScreenState extends State<AdminCategoriasScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: activo
-                                      ? Colors.green.withOpacity(0.12)
-                                      : Colors.red.withOpacity(0.12),
+                                      ? Colors.green.withValues(alpha: 0.12)
+                                      : Colors.red.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(

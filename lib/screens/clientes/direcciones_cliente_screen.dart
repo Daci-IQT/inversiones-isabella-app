@@ -240,7 +240,7 @@ class _DireccionesClienteScreenState extends State<DireccionesClienteScreen> {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       value: predeterminada,
-                      activeColor: primaryColor,
+                      activeThumbColor: primaryColor,
                       title: const Text(
                         "Usar como dirección predeterminada",
                         style: TextStyle(fontWeight: FontWeight.bold),

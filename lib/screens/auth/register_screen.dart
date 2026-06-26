@@ -1,63 +1,226 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-/// 🧾 REGISTRO DE USUARIO
-////////////////////////////////////////////////////////
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final nombreController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final confirmarPasswordController = TextEditingController();
 
-  // 🔹 FUNCIÓN REGISTRO
-  Future<void> registrar(BuildContext context) async {
+  final Color primaryColor = const Color.fromARGB(255, 243, 33, 96);
+
+  bool cargando = false;
+  bool ocultarPassword = true;
+  bool ocultarConfirmarPassword = true;
+
+  Future<void> registrar() async {
+    final nombre = nombreController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    final confirmar = confirmarPasswordController.text.trim();
+
+    if (nombre.isEmpty || email.isEmpty || password.isEmpty || confirmar.isEmpty) {
+      mensaje("Completa todos los campos", Colors.redAccent);
+      return;
+    }
+
+    if (password.length < 6) {
+      mensaje("La contraseña debe tener mínimo 6 caracteres", Colors.redAccent);
+      return;
+    }
+
+    if (password != confirmar) {
+      mensaje("Las contraseñas no coinciden", Colors.redAccent);
+      return;
+    }
+
+    setState(() {
+      cargando = true;
+    });
+
     try {
-      // 🔐 Crear usuario
-      UserCredential user = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
       );
 
-      String uid = user.user!.uid;
+      final user = userCredential.user;
 
-      // ☁️ Guardar en Firestore
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
-        'email': emailController.text.trim(),
+      if (user == null) return;
+
+      await user.updateDisplayName(nombre);
+      await user.sendEmailVerification();
+
+      await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set({
+        'uid': user.uid,
+        'nombre': nombre,
+        'correo': email,
+        'email': email,
+        'fotoUrl': '',
         'rol': 'cliente',
+        'proveedor': 'correo',
+        'correoVerificado': false,
+        'estado': 'activo',
+        'fechaRegistro': FieldValue.serverTimestamp(),
+        'fechaActualizacion': FieldValue.serverTimestamp(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Usuario registrado correctamente"),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (!mounted) return;
 
-      Navigator.pop(context);
+      await FirebaseAuth.instance.signOut();
 
+      mostrarDialogoVerificacion(email);
+    } on FirebaseAuthException catch (e) {
+      String texto = "Error al registrar usuario";
+
+      if (e.code == 'email-already-in-use') {
+        texto = "Este correo ya está registrado";
+      } else if (e.code == 'invalid-email') {
+        texto = "Correo electrónico inválido";
+      } else if (e.code == 'weak-password') {
+        texto = "La contraseña es muy débil";
+      }
+
+      mensaje(texto, Colors.redAccent);
     } catch (e) {
-      print("ERROR: $e");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error al registrar usuario"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      mensaje("Ocurrió un error inesperado", Colors.redAccent);
+    } finally {
+      if (mounted) {
+        setState(() {
+          cargando = false;
+        });
+      }
     }
+  }
+
+  void mostrarDialogoVerificacion(String email) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Text("Verifica tu correo"),
+          content: Text(
+            "Te enviamos un enlace de verificación a:\n\n$email\n\nRevisa tu correo antes de iniciar sesión.",
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              child: const Text(
+                "Entendido",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void mensaje(String texto, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          texto,
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget logoNegocio() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('configuracion')
+          .doc('negocio')
+          .snapshots(),
+      builder: (context, snapshot) {
+        String nombreNegocio = "Crear cuenta";
+        String subtitulo = "Regístrate para comprar en Inversiones Isabella";
+        String logoUrl = "";
+
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          nombreNegocio = data['nombreNegocio'] ?? "Inversiones Isabella";
+          subtitulo = "Regístrate para comprar en nuestra tienda";
+          logoUrl = data['logoUrl'] ?? "";
+        }
+
+        return Column(
+          children: [
+            CircleAvatar(
+              radius: 44,
+              backgroundColor: primaryColor.withValues(alpha: 0.12),
+              backgroundImage: logoUrl.isNotEmpty ? NetworkImage(logoUrl) : null,
+              child: logoUrl.isEmpty
+                  ? Icon(
+                      Icons.person_add_alt_1,
+                      color: primaryColor,
+                      size: 46,
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              nombreNegocio,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              subtitulo,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    nombreController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmarPasswordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
-      //////////////////////////////////////////////////////
-      /// 🎨 FONDO DEGRADADO
-      //////////////////////////////////////////////////////
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -68,133 +231,156 @@ class RegisterScreen extends StatelessWidget {
             ],
           ),
         ),
-
-        //////////////////////////////////////////////////////
-        /// 📌 CONTENIDO CENTRADO
-        //////////////////////////////////////////////////////
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-
-              //////////////////////////////////////////////////
-              /// 🧾 TARJETA DE REGISTRO
-              //////////////////////////////////////////////////
               child: Container(
-                padding: EdgeInsets.all(25),
+                padding: const EdgeInsets.all(25),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(26),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black45,
-                      blurRadius: 15,
-                      offset: Offset(0, 8),
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 9),
                     ),
                   ],
                 ),
-
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    logoNegocio(),
 
-                    //////////////////////////////////////////////////
-                    /// 👤 ICONO
-                    //////////////////////////////////////////////////
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Color.fromARGB(255, 243, 33, 96),
-                      child: Icon(Icons.person_add,
-                          color: Colors.white, size: 40),
-                    ),
+                    const SizedBox(height: 26),
 
-                    SizedBox(height: 15),
-
-                    //////////////////////////////////////////////////
-                    /// 🏷️ TÍTULO
-                    //////////////////////////////////////////////////
-                    Text(
-                      "Crear Cuenta",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                    TextField(
+                      controller: nombreController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: "Nombre completo",
+                        prefixIcon: const Icon(Icons.person_outline),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                     ),
 
-                    SizedBox(height: 5),
+                    const SizedBox(height: 14),
 
-                    Text(
-                      "Regístrate para continuar",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-
-                    SizedBox(height: 25),
-
-                    //////////////////////////////////////////////////
-                    /// 📧 EMAIL
-                    //////////////////////////////////////////////////
                     TextField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                         labelText: "Correo electrónico",
-                        prefixIcon: Icon(Icons.email),
+                        prefixIcon: const Icon(Icons.email_outlined),
                         filled: true,
                         fillColor: Colors.grey[100],
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                     ),
 
-                    SizedBox(height: 15),
+                    const SizedBox(height: 14),
 
-                    //////////////////////////////////////////////////
-                    /// 🔑 PASSWORD
-                    //////////////////////////////////////////////////
                     TextField(
                       controller: passwordController,
-                      obscureText: true,
+                      obscureText: ocultarPassword,
                       decoration: InputDecoration(
                         labelText: "Contraseña",
-                        prefixIcon: Icon(Icons.lock),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            ocultarPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              ocultarPassword = !ocultarPassword;
+                            });
+                          },
+                        ),
                         filled: true,
                         fillColor: Colors.grey[100],
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                     ),
 
-                    SizedBox(height: 25),
+                    const SizedBox(height: 14),
 
-                    //////////////////////////////////////////////////
-                    /// 🔘 BOTÓN REGISTRAR
-                    //////////////////////////////////////////////////
+                    TextField(
+                      controller: confirmarPasswordController,
+                      obscureText: ocultarConfirmarPassword,
+                      decoration: InputDecoration(
+                        labelText: "Confirmar contraseña",
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            ocultarConfirmarPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              ocultarConfirmarPassword =
+                                  !ocultarConfirmarPassword;
+                            });
+                          },
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () => registrar(context),
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: cargando ? null : registrar,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Color.fromARGB(255, 243, 33, 96),
+                          backgroundColor: primaryColor,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: Text(
-                          "Registrar",
-                          style: TextStyle(fontSize: 16),
+                        icon: cargando
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.person_add,
+                                color: Colors.white,
+                              ),
+                        label: Text(
+                          cargando ? "Registrando..." : "Crear cuenta",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
 
-                    SizedBox(height: 15),
+                    const SizedBox(height: 16),
 
-                    //////////////////////////////////////////////////
-                    /// 🔙 VOLVER A LOGIN
-                    //////////////////////////////////////////////////
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
@@ -202,7 +388,7 @@ class RegisterScreen extends StatelessWidget {
                       child: Text(
                         "¿Ya tienes cuenta? Inicia sesión",
                         style: TextStyle(
-                          color: Color.fromARGB(255, 243, 33, 96),
+                          color: primaryColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

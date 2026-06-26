@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../clientes/direcciones_cliente_screen.dart';
-
-
-/// PANTALLA REALIZAR PAGO
-////////////////////////////////////////////////////////
+import '../../services/pedido_service.dart';
 
 class RealizarPagoScreen extends StatefulWidget {
   final List<Map<String, dynamic>> carrito;
@@ -25,16 +22,22 @@ class RealizarPagoScreen extends StatefulWidget {
 
 class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
   final FirebaseAuth auth = FirebaseAuth.instance;
+  final PedidosService pedidosService = PedidosService();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   final Color primaryColor = const Color.fromARGB(255, 243, 33, 96);
   final Color orangeColor = const Color(0xFFFF7A00);
 
   String metodoPagoSeleccionado = "Contra entrega";
+  String metodoEntregaSeleccionado = "delivery";
+  double costoDelivery = 5.00;
+
   bool procesando = false;
 
   Map<String, dynamic>? direccionSeleccionada;
   String? direccionSeleccionadaId;
+
+  double get totalFinal => widget.total + costoDelivery;
 
   @override
   void initState() {
@@ -79,9 +82,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
     final usuarioActual = auth.currentUser;
     if (usuarioActual == null) return {};
 
-    final doc =
-        await firestore.collection('usuarios').doc(usuarioActual.uid).get();
-
+    final doc = await firestore.collection('usuarios').doc(usuarioActual.uid).get();
     return doc.data() ?? {};
   }
 
@@ -92,9 +93,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DireccionesClienteScreen(
-          uid: usuarioActual.uid,
-        ),
+        builder: (_) => DireccionesClienteScreen(uid: usuarioActual.uid),
       ),
     );
 
@@ -116,7 +115,9 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
       direccionSeleccionada!['dni'],
     ];
 
-    return campos.every((campo) => campo != null && campo.toString().trim().isNotEmpty);
+    return campos.every(
+      (campo) => campo != null && campo.toString().trim().isNotEmpty,
+    );
   }
 
   Future<void> confirmarFinalizarPedido() async {
@@ -139,16 +140,18 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: const Text("Finalizar compra"),
-          content: const Text("¿Estás seguro de finalizar tu compra?"),
+          content: Text(
+            "¿Estás seguro de finalizar tu compra?\n\n"
+            "Método de entrega: ${metodoEntregaSeleccionado == 'delivery' ? 'Delivery' : 'Recojo en tienda'}\n"
+            "Total a pagar: S/ ${totalFinal.toStringAsFixed(2)}",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text("No"),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
               onPressed: () => Navigator.pop(context, true),
               child: const Text(
                 "Sí, finalizar",
@@ -186,9 +189,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
 
     if (!direccionValida()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Debes registrar una dirección válida"),
-        ),
+        const SnackBar(content: Text("Debes registrar una dirección válida")),
       );
       return;
     }
@@ -198,32 +199,42 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
     });
 
     try {
-      
-
-    
       final dir = direccionSeleccionada!;
 
       final direccionTexto =
           "${dir['direccionExacta']}, ${dir['distrito']}, ${dir['provincia']}, ${dir['departamento']}, ${dir['pais']}";
 
-      await firestore.collection('pedidos').add({
-        'clienteId': usuarioActual.uid,
-        'clienteNombre':
-            "${dir['nombre'] ?? ''} ${dir['apellidos'] ?? ''}".trim(),
-        'clienteCorreo': usuarioActual.email ?? '',
-        'clienteDireccion': direccionTexto,
-        'clienteCelular': dir['numeroContacto'] ?? '',
-        'clienteDni': dir['dni'] ?? '',
-        'direccionId': direccionSeleccionadaId,
-        'direccionEntrega': dir,
-        'productos': widget.carrito,
-        'total': widget.total,
-        'metodoPago': metodoPagoSeleccionado,
-        'estadoPago': 'pendiente',
-        'estado': 'pendiente',
-        'fechaPedido': FieldValue.serverTimestamp(),
-        'fechaActualizacion': FieldValue.serverTimestamp(),
-      });
+      await pedidosService.crearPedidoConStock(
+        productos: widget.carrito,
+        pedidoData: {
+          'clienteId': usuarioActual.uid,
+          'clienteNombre':
+              "${dir['nombre'] ?? ''} ${dir['apellidos'] ?? ''}".trim(),
+          'clienteCorreo': usuarioActual.email ?? '',
+          'clienteDireccion': direccionTexto,
+          'clienteCelular': dir['numeroContacto'] ?? '',
+          'clienteDni': dir['dni'] ?? '',
+          'direccionId': direccionSeleccionadaId,
+          'direccionEntrega': dir,
+          'productos': widget.carrito,
+
+          'totalProductos': widget.total,
+          'costoDelivery': costoDelivery,
+          'total': totalFinal,
+
+          'metodoPago': metodoPagoSeleccionado,
+          'estadoPago': 'pendiente',
+          'estado': 'pendiente',
+
+          'metodoEntrega': metodoEntregaSeleccionado,
+          'estadoEntrega': 'pendiente',
+          'repartidorId': '',
+'repartidorNombre': '',
+'fotoEntregaUrl': '',
+'fechaEntrega': null,
+'entregadoPor': '',
+        },
+      );
 
       widget.carrito.clear();
       widget.actualizar();
@@ -239,6 +250,8 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
 
       Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.redAccent,
@@ -267,7 +280,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -278,10 +291,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         children: [
           Text(
             titulo,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           child,
@@ -291,186 +301,70 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
   }
 
   Widget direccionCliente() {
-  final dir = direccionSeleccionada;
+    final dir = direccionSeleccionada;
 
-  return InkWell(
-    onTap: irADirecciones,
-    borderRadius: BorderRadius.circular(16),
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: direccionValida()
-              ? Colors.green
-              : Colors.redAccent,
-          width: 1.4,
+    return InkWell(
+      onTap: irADirecciones,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F7F7),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: direccionValida() ? Colors.green : Colors.redAccent,
+            width: 1.4,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.location_on,
+              color: direccionValida() ? Colors.green : Colors.redAccent,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: dir == null
+                  ? const Text(
+                      "No tienes dirección registrada. Presiona aquí para agregar una.",
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "${dir['nombre'] ?? ''} ${dir['apellidos'] ?? ''}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 5),
+                        Text("${dir['direccionExacta'] ?? ''}"),
+                        Text(
+                          "${dir['distrito'] ?? ''}, ${dir['provincia'] ?? ''}, ${dir['departamento'] ?? ''}, ${dir['pais'] ?? ''}",
+                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          "Celular: ${dir['numeroContacto'] ?? ''} | DNI: ${dir['dni'] ?? ''}",
+                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                        ),
+                      ],
+                    ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[600]),
+          ],
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: direccionValida()
-                  ? Colors.green.withOpacity(0.10)
-                  : Colors.redAccent.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              Icons.location_on,
-              color: direccionValida()
-                  ? Colors.green
-                  : Colors.redAccent,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: dir == null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "No tienes dirección registrada",
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        "Presiona aquí para agregar una dirección antes de continuar.",
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              "${dir['nombre'] ?? ''} ${dir['apellidos'] ?? ''}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-
-                          if (dir['predeterminada'] == true)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: orangeColor,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                "Principal",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      Text(
-                        "${dir['direccionExacta'] ?? ''}",
-                        style: const TextStyle(
-                          fontSize: 13,
-                        ),
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        "${dir['distrito'] ?? ''}, ${dir['provincia'] ?? ''}, ${dir['departamento'] ?? ''}, ${dir['pais'] ?? ''}",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.phone,
-                            size: 14,
-                            color: Colors.grey[600],
-                          ),
-
-                          const SizedBox(width: 4),
-
-                          Text(
-                            "${dir['numeroContacto'] ?? ''}",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 12,
-                            ),
-                          ),
-
-                          const SizedBox(width: 12),
-
-                          Icon(
-                            Icons.badge,
-                            size: 14,
-                            color: Colors.grey[600],
-                          ),
-
-                          const SizedBox(width: 4),
-
-                          Text(
-                            "${dir['dni'] ?? ''}",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-            color: Colors.grey[600],
-          ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
   Widget detalleProducto(Map<String, dynamic> item) {
     final cantidad = int.tryParse(item['cantidad'].toString()) ?? 1;
     final precio = double.tryParse(item['precio'].toString()) ?? 0;
     final subtotal = cantidad * precio;
-
     final imagenUrl = item['imagenUrl'] ?? '';
     final colorSeleccionado = item['colorSeleccionado'];
     final tallaSeleccionada = item['tallaSeleccionada'];
@@ -496,16 +390,11 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                 : Container(
                     width: 78,
                     height: 78,
-                    color: primaryColor.withOpacity(0.10),
-                    child: Icon(
-                      Icons.shopping_bag,
-                      color: primaryColor,
-                    ),
+                    color: primaryColor.withValues(alpha: 0.10),
+                    child: Icon(Icons.shopping_bag, color: primaryColor),
                   ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,53 +403,86 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                   item['nombre'] ?? 'Producto',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-
-                const SizedBox(height: 4),
-
                 if (colorSeleccionado != null || tallaSeleccionada != null)
                   Text(
                     "${colorSeleccionado != null ? 'Color: $colorSeleccionado' : ''}"
                     "${colorSeleccionado != null && tallaSeleccionada != null ? ' | ' : ''}"
                     "${tallaSeleccionada != null ? 'Talla: $tallaSeleccionada' : ''}",
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
-
-                const SizedBox(height: 4),
-
                 Text(
                   "Cantidad: $cantidad",
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
                 ),
-
                 Text(
                   "Precio: S/ ${precio.toStringAsFixed(2)}",
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
                 ),
               ],
             ),
           ),
-
           Text(
             "S/ ${subtotal.toStringAsFixed(2)}",
-            style: TextStyle(
-              color: primaryColor,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget metodoEntregaItem({
+    required String titulo,
+    required String valor,
+    required IconData icono,
+    required String descripcion,
+  }) {
+    final seleccionado = metodoEntregaSeleccionado == valor;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          metodoEntregaSeleccionado = valor;
+          costoDelivery = valor == "delivery" ? 5.00 : 0.00;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: seleccionado
+              ? primaryColor.withValues(alpha: 0.10)
+              : Colors.grey.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: seleccionado ? primaryColor : Colors.grey.shade300,
+            width: seleccionado ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icono, color: seleccionado ? primaryColor : Colors.grey),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 3),
+                  Text(
+                    descripcion,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              seleccionado ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: seleccionado ? primaryColor : Colors.grey,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -585,8 +507,8 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: seleccionado
-              ? primaryColor.withOpacity(0.10)
-              : Colors.grey.withOpacity(0.06),
+              ? primaryColor.withValues(alpha: 0.10)
+              : Colors.grey.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: seleccionado ? primaryColor : Colors.grey.shade300,
@@ -595,10 +517,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              icono,
-              color: disponible ? primaryColor : Colors.grey,
-            ),
+            Icon(icono, color: disponible ? primaryColor : Colors.grey),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -612,16 +531,11 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
             if (!disponible)
               const Text(
                 "Próximamente",
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             if (disponible)
               Icon(
-                seleccionado
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
+                seleccionado ? Icons.radio_button_checked : Icons.radio_button_off,
                 color: seleccionado ? primaryColor : Colors.grey,
               ),
           ],
@@ -634,25 +548,39 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.08),
+        color: primaryColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
       ),
+      child: Column(
+        children: [
+          filaResumenPago("Subtotal productos", widget.total),
+          filaResumenPago("Delivery", costoDelivery),
+          const Divider(),
+          filaResumenPago("Total del pedido", totalFinal, destacado: true),
+        ],
+      ),
+    );
+  }
+
+  Widget filaResumenPago(String titulo, double monto, {bool destacado = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
-              "Total del pedido",
+              titulo,
               style: TextStyle(
-                fontWeight: FontWeight.bold,
+                fontWeight: destacado ? FontWeight.bold : FontWeight.w500,
               ),
             ),
           ),
           Text(
-            "S/ ${widget.total.toStringAsFixed(2)}",
+            "S/ ${monto.toStringAsFixed(2)}",
             style: TextStyle(
-              color: primaryColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+              color: destacado ? primaryColor : Colors.black87,
+              fontWeight: destacado ? FontWeight.bold : FontWeight.w500,
+              fontSize: destacado ? 18 : 14,
             ),
           ),
         ],
@@ -672,7 +600,6 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
       body: FutureBuilder<Map<String, dynamic>>(
         future: obtenerCliente(),
         builder: (context, snapshot) {
-
           return Column(
             children: [
               Expanded(
@@ -681,21 +608,38 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                   child: Column(
                     children: [
                       tarjetaSeccion(
-                        titulo: "Direccion de entrega",
+                        titulo: "Dirección de entrega",
                         child: direccionCliente(),
                       ),
-
+                      tarjetaSeccion(
+                        titulo: "Método de entrega",
+                        child: Column(
+                          children: [
+                            metodoEntregaItem(
+                              titulo: "Delivery",
+                              valor: "delivery",
+                              icono: Icons.local_shipping,
+                              descripcion: "Entrega a domicilio. Costo: S/ 5.00",
+                            ),
+                            metodoEntregaItem(
+                              titulo: "Recojo en tienda",
+                              valor: "recojo_tienda",
+                              icono: Icons.store,
+                              descripcion: "El cliente recoge su pedido en la tienda.",
+                            ),
+                          ],
+                        ),
+                      ),
                       tarjetaSeccion(
                         titulo: "Detalle del pedido",
                         child: Column(
                           children: [
-                            ...widget.carrito.map(detalleProducto).toList(),
+                            ...widget.carrito.map(detalleProducto),
                             const SizedBox(height: 8),
                             resumenTotal(),
                           ],
                         ),
                       ),
-
                       tarjetaSeccion(
                         titulo: "Método de pago",
                         child: Column(
@@ -727,14 +671,13 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                   ),
                 ),
               ),
-
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.10),
+                      color: Colors.black.withValues(alpha: 0.10),
                       blurRadius: 12,
                       offset: const Offset(0, -4),
                     ),
@@ -754,7 +697,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                           ),
                         ),
                         Text(
-                          "S/ ${widget.total.toStringAsFixed(2)}",
+                          "S/ ${totalFinal.toStringAsFixed(2)}",
                           style: TextStyle(
                             color: primaryColor,
                             fontSize: 22,
@@ -763,9 +706,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -777,8 +718,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed:
-                            procesando ? null : confirmarFinalizarPedido,
+                        onPressed: procesando ? null : confirmarFinalizarPedido,
                         icon: procesando
                             ? const SizedBox(
                                 width: 18,
@@ -788,14 +728,9 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Icon(
-                                Icons.check_circle,
-                                color: Colors.white,
-                              ),
+                            : const Icon(Icons.check_circle, color: Colors.white),
                         label: Text(
-                          procesando
-                              ? "Enviando pedido..."
-                              : "Finalizar pedido",
+                          procesando ? "Enviando pedido..." : "Finalizar pedido",
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

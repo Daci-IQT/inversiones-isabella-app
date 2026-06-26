@@ -59,8 +59,8 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: activo
-            ? Colors.green.withOpacity(0.12)
-            : Colors.red.withOpacity(0.12),
+            ? Colors.green.withValues(alpha: 0.12)
+            : Colors.red.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -109,7 +109,7 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
         const SizedBox(height: 12),
 
         DropdownButtonFormField<String>(
-          value: estadoFiltro,
+          initialValue: estadoFiltro,
           isExpanded: true,
           decoration: InputDecoration(
             labelText: "Filtrar por estado",
@@ -194,7 +194,7 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
                         Center(
                           child: CircleAvatar(
                             radius: 42,
-                            backgroundColor: primaryColor.withOpacity(0.12),
+                            backgroundColor: primaryColor.withValues(alpha: 0.12),
                             child: Icon(
                               Icons.person,
                               size: 45,
@@ -259,7 +259,7 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.08),
+                            color: Colors.orange.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Text(
@@ -378,7 +378,7 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
         child: ListTile(
           contentPadding: const EdgeInsets.all(14),
           leading: CircleAvatar(
-            backgroundColor: primaryColor.withOpacity(0.12),
+            backgroundColor: primaryColor.withValues(alpha: 0.12),
             child: Icon(
               Icons.person,
               color: primaryColor,

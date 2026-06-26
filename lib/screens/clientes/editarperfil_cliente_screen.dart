@@ -134,7 +134,7 @@ class _EditarPerfilClienteScreenState extends State<EditarPerfilClienteScreen> {
               children: [
                 CircleAvatar(
                   radius: 58,
-                  backgroundColor: primaryColor.withOpacity(0.15),
+                  backgroundColor: primaryColor.withValues(alpha: 0.15),
                   backgroundImage:
                       fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
                   child: fotoUrl.isEmpty

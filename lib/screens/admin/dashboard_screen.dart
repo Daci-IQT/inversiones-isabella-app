@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-
+import 'inventario_analytics_screen.dart';
+import 'ventas_analytics_screen.dart';
+import 'pedidos_analytics_screen.dart';
+import 'clientes_analytics_screen.dart';
+import 'delivery_analytics_screen.dart';
+import 'reclamos_analytics_screen.dart';
 
 
 /// 📊 DASHBOARD PRINCIPAL
@@ -17,51 +21,94 @@ class DashboardScreen extends StatelessWidget {
 
   final Color primaryColor = const Color.fromARGB(255, 243, 33, 96);
 
-  Widget dashboardCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+ Widget dashboardCard({
+  required String title,
+  required String value,
+  required String subtitle,
+  required IconData icon,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(20),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.15),
-            child: Icon(icon, color: color),
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 23),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 13,
+                color: Colors.grey[500],
+              ),
+            ],
           ),
+
           const Spacer(),
+
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 26,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
           ),
+
+          const SizedBox(height: 3),
+
           Text(
             title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.grey[600],
-              fontSize: 13,
+              fontSize: 10,
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget activityItem({
     required IconData icon,
@@ -80,7 +127,7 @@ class DashboardScreen extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: color.withOpacity(0.12),
+            backgroundColor: color.withValues(alpha: 0.12),
             child: Icon(icon, color: color),
           ),
           const SizedBox(width: 12),
@@ -137,12 +184,38 @@ class DashboardScreen extends StatelessWidget {
                     }).length;
 
                     final bajoStock = productos.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final stock = data['stock'] ?? 0;
-                      final activo = data['activo'] ?? true;
-                      return activo == true && stock < 4;
-                    }).length;
+  final data = doc.data() as Map<String, dynamic>;
 
+  final stock = int.tryParse(data['stock'].toString()) ?? 0;
+  final stockMinimo =
+      int.tryParse((data['stockMinimo'] ?? 5).toString()) ?? 5;
+  final activo = data['activo'] ?? true;
+
+  return activo == true && stock > 0 && stock <= stockMinimo;
+}).length;
+
+final productosAgotados = productos.where((doc) {
+  final data = doc.data() as Map<String, dynamic>;
+
+  final stock = int.tryParse(data['stock'].toString()) ?? 0;
+  final activo = data['activo'] ?? true;
+
+  return activo == true && stock <= 0;
+}).length;
+
+double valorInventario = 0;
+
+for (final doc in productos) {
+  final data = doc.data() as Map<String, dynamic>;
+
+  final stock = int.tryParse(data['stock'].toString()) ?? 0;
+  final precio = double.tryParse(data['precio'].toString()) ?? 0;
+  final activo = data['activo'] ?? true;
+
+  if (activo) {
+    valorInventario += stock * precio;
+  }
+}
                     final pedidosPendientes = pedidos.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
                       return data['estado'] == 'pendiente';
@@ -153,6 +226,17 @@ class DashboardScreen extends StatelessWidget {
                       final estado = data['estado'] ?? 'pendiente';
                       return estado == 'pendiente' || estado == 'en_revision';
                     }).length;
+                    final deliveryPendientes = pedidos.where((doc) {
+  final data = doc.data() as Map<String, dynamic>;
+  return (data['metodoEntrega'] ?? '') == 'delivery' &&
+      (data['estadoEntrega'] ?? '') == 'asignado';
+}).length;
+
+final deliveryEnCamino = pedidos.where((doc) {
+  final data = doc.data() as Map<String, dynamic>;
+  return (data['metodoEntrega'] ?? '') == 'delivery' &&
+      (data['estadoEntrega'] ?? '') == 'en_camino';
+}).length;
 
                     double ventasEntregadas = 0;
 
@@ -186,51 +270,110 @@ class DashboardScreen extends StatelessWidget {
                           const SizedBox(height: 25),
 
                           GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 14,
-                            mainAxisSpacing: 14,
-                            childAspectRatio: 1.25,
-                            children: [
-                              dashboardCard(
-                                title: "Productos activos",
-                                value: productosActivos.toString(),
-                                icon: Icons.inventory_2,
-                                color: Colors.blue,
-                              ),
-                              dashboardCard(
-                                title: "Pedidos pendientes",
-                                value: pedidosPendientes.toString(),
-                                icon: Icons.shopping_cart,
-                                color: Colors.orange,
-                              ),
-                              dashboardCard(
-                                title: "Clientes",
-                                value: clientes.length.toString(),
-                                icon: Icons.people,
-                                color: Colors.green,
-                              ),
-                              dashboardCard(
-                                title: "Bajo stock",
-                                value: bajoStock.toString(),
-                                icon: Icons.warning,
-                                color: Colors.red,
-                              ),
-                              dashboardCard(
-                                title: "Reclamos pendientes",
-                                value: reclamosPendientes.toString(),
-                                icon: Icons.report_problem,
-                                color: Colors.deepOrange,
-                              ),
-                              dashboardCard(
-                                title: "Ventas entregadas",
-                                value: "S/ ${ventasEntregadas.toStringAsFixed(2)}",
-                                icon: Icons.payments,
-                                color: primaryColor,
-                              ),
-                            ],
-                          ),
+  crossAxisCount: 2,
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  crossAxisSpacing: 10,
+  mainAxisSpacing: 10,
+  childAspectRatio: 1.20,
+  children: [
+    dashboardCard(
+      title: "Delivery",
+      value: deliveryPendientes.toString(),
+      subtitle: "$deliveryEnCamino en camino",
+      icon: Icons.local_shipping,
+      color: Colors.blue,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DeliveryAnalyticsScreen(),
+          ),
+        );
+      },
+    ),
+
+    dashboardCard(
+      title: "Pedidos",
+      value: pedidosPendientes.toString(),
+      subtitle: "Pendientes por atender",
+      icon: Icons.shopping_cart,
+      color: Colors.orange,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const PedidosAnalyticsScreen(),
+          ),
+        );
+      },
+    ),
+
+    dashboardCard(
+      title: "Clientes",
+      value: clientes.length.toString(),
+      subtitle: "Clientes registrados",
+      icon: Icons.people,
+      color: Colors.green,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ClientesAnalyticsScreen(),
+          ),
+        );
+      },
+    ),
+
+    dashboardCard(
+      title: "Bajo stock",
+      value: bajoStock.toString(),
+      subtitle: "Necesitan reposición",
+      icon: Icons.warning,
+      color: Colors.amber,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const InventarioAnalyticsScreen(),
+          ),
+        );
+      },
+    ),
+
+    dashboardCard(
+      title: "Reclamos",
+      value: reclamosPendientes.toString(),
+      subtitle: "Pendientes o en revisión",
+      icon: Icons.report_problem,
+      color: Colors.red,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ReclamosAnalyticsScreen(),
+          ),
+        );
+      },
+    ),
+
+    dashboardCard(
+      title: "Ventas",
+      value: "S/ ${ventasEntregadas.toStringAsFixed(0)}",
+      subtitle: "Ventas entregadas",
+      icon: Icons.payments,
+      color: primaryColor,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const VentasAnalyticsScreen(),
+          ),
+        );
+      },
+    ),
+  ],
+),
 
                           const SizedBox(height: 28),
 

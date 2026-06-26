@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/clientes/panel_cliente.dart';
-
+import 'screens/auth/auth_wrapper.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Inversiones Isabella',
       debugShowCheckedModeBanner: false,
-      home: const ClientePanel(),
+      home: const SplashScreen(),
     );
   }
 }

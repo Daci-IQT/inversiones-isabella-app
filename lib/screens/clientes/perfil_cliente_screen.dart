@@ -10,7 +10,7 @@ import '../clientes/configuracion_cliente_screen.dart';
 import '../clientes/editarperfil_cliente_screen.dart';
 import '../clientes/pedidos_cliente_screen.dart';
 import '../auth/login_screen.dart';
-
+import '../../widgets/seleccionar_variante_producto.dart';
 
 
 /// PANTALLA PRINCIPAL PERFIL CLIENTE
@@ -147,6 +147,7 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
           'categoriaNombre': producto['categoriaNombre'],
           'colorSeleccionado': colorSeleccionado,
           'tallaSeleccionada': tallaSeleccionada,
+          'stockKey': producto['stockKey'],
         });
 
         agregado = true;
@@ -158,644 +159,491 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
   }
 
   void mostrarDetalleProductoPerfil({
-    required String productoId,
-    required Map<String, dynamic> producto,
-  }) {
-    final imagenUrl = producto['imagenUrl'] ?? '';
-    final imagenes = List<String>.from(producto['imagenes'] ?? []);
-    final colores = List<String>.from(producto['colores'] ?? []);
-    final tallas = List<String>.from(producto['tallas'] ?? []);
-    final stock = int.tryParse(producto['stock'].toString()) ?? 0;
+  required String productoId,
+  required Map<String, dynamic> producto,
+}) {
+  final imagenUrl = producto['imagenUrl'] ?? '';
+  final imagenes = List<String>.from(producto['imagenes'] ?? []);
+  final stock = int.tryParse(producto['stock'].toString()) ?? 0;
+ final rootContext = Navigator.of(context, rootNavigator: true).context;
+ bool productoAgregado = false;
 
-    final List<String> imagenesMostrar = imagenes.isNotEmpty
-        ? imagenes
-        : imagenUrl.toString().isNotEmpty
-            ? [imagenUrl]
-            : [];
+  final List<String> imagenesMostrar = imagenes.isNotEmpty
+      ? imagenes
+      : imagenUrl.toString().isNotEmpty
+          ? [imagenUrl]
+          : [];
 
-    String? colorSeleccionado;
-    String? tallaSeleccionada;
-    int cantidad = 1;
-    bool agregadoCorrectamente = false;
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+    ),
+    builder: (_) {
+return StatefulBuilder(
+builder: (context, setDetalleState) { return DraggableScrollableSheet(
+        initialChildSize: 0.92,
+        maxChildSize: 0.96,
+        minChildSize: 0.65,
+        expand: false,
+        builder: (context, scrollController) {
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                controller: scrollController,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: 320,
+                      width: double.infinity,
+                      child: imagenesMostrar.isNotEmpty
+                          ? PageView(
+                              children: imagenesMostrar.map((img) {
+                                return Image.network(
+                                  img,
+                                  width: double.infinity,
+                                  fit: BoxFit.contain,
+                                );
+                              }).toList(),
+                            )
+                          : Container(
+                              color: primaryColor.withValues(alpha: 0.10),
+                              child: Icon(
+                                Icons.shopping_bag,
+                                size: 80,
+                                color: primaryColor,
+                              ),
+                            ),
+                    ),
 
-    String? mensajeModal;
-    Color colorMensajeModal = Colors.green;
-    IconData iconoMensajeModal = Icons.check_circle;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            void mostrarMensajeModal({
-              required String mensaje,
-              required Color color,
-              required IconData icono,
-            }) {
-              setModalState(() {
-                mensajeModal = mensaje;
-                colorMensajeModal = color;
-                iconoMensajeModal = icono;
-              });
-
-              Future.delayed(const Duration(seconds: 2), () {
-                if (mounted) {
-                  setModalState(() {
-                    mensajeModal = null;
-                  });
-                }
-              });
-            }
-
-            return Stack(
-              children: [
-                DraggableScrollableSheet(
-                  initialChildSize: 0.92,
-                  maxChildSize: 0.96,
-                  minChildSize: 0.65,
-                  expand: false,
-                  builder: (context, scrollController) {
-                    return SingleChildScrollView(
-                      controller: scrollController,
+                    Padding(
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Stack(
-                            children: [
-                              SizedBox(
-                                height: 320,
-                                width: double.infinity,
-                                child: imagenesMostrar.isNotEmpty
-                                    ? PageView(
-                                        children: imagenesMostrar.map((img) {
-                                          return Image.network(
-                                            img,
-                                            width: double.infinity,
-                                            fit: BoxFit.cover,
-                                          );
-                                        }).toList(),
-                                      )
-                                    : Container(
-                                        color: primaryColor.withOpacity(0.10),
-                                        child: Icon(
-                                          Icons.shopping_bag,
-                                          size: 80,
-                                          color: primaryColor,
-                                        ),
-                                      ),
+                          Text(
+                            producto['nombre'] ?? 'Producto',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "S/ ${producto['precio'] ?? 0}",
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Text(
+                            stock > 0
+                                ? "Stock total disponible: $stock"
+                                : "Sin stock",
+                            style: TextStyle(
+                              color: stock > 0 ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Text(
+                            producto['descripcion'] ?? 'Sin descripción',
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              height: 1.4,
+                            ),
+                          ),
+
+                          const SizedBox(height: 22),
+
+                          if (List<String>.from(producto['colores'] ?? [])
+                              .isNotEmpty) ...[
+                            const Text(
+                              "Colores disponibles",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
-                              Positioned(
-                                top: 14,
-                                left: 14,
-                                child: CircleAvatar(
-                                  backgroundColor:
-                                      Colors.black.withOpacity(0.45),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () => Navigator.pop(context),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 10,
+                              children:
+                                  List<String>.from(producto['colores'] ?? [])
+                                      .map((color) {
+                                return Chip(
+                                  label: Text(color),
+                                  avatar: CircleAvatar(
+                                    backgroundColor: obtenerColor(color),
                                   ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 18),
+                          ],
+
+                          if (List<String>.from(producto['tallas'] ?? [])
+                              .isNotEmpty) ...[
+                            const Text(
+                              "Tallas disponibles",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children:
+                                  List<String>.from(producto['tallas'] ?? [])
+                                      .map((talla) {
+                                return Chip(label: Text(talla));
+                              }).toList(),
+                            ),
+                          ],
+
+                          productosRelacionadosPerfil(
+                            productoActualId: productoId,
+                            categoriaId: producto['categoriaId'],
+                          ),
+
+                          const SizedBox(height: 110),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Positioned(
+                top: 14,
+                left: 14,
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.45),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 14,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: productoAgregado
+    ? Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: () {
+                setDetalleState(() {
+                  productoAgregado = false;
+                });
+              },
+              icon: const Icon(Icons.shopping_bag_outlined),
+              label: const Text("Seguir viendo"),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                minimumSize: const Size(double.infinity, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                irAlCarrito();
+              },
+              icon: const Icon(Icons.shopping_cart, color: Colors.white),
+              label: const Text(
+                "Ir al carrito",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      )
+    : SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: stock > 0 ? primaryColor : Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          onPressed: stock > 0
+              ? () {
+                  mostrarSelectorVarianteProducto(
+                    context: rootContext,
+                    productoId: productoId,
+                    producto: producto,
+                    onAgregar: (itemCarrito) {
+                      final agregado = agregarAlCarritoDesdePerfil(
+                        itemCarrito,
+                        productoId,
+                      );
+
+                      if (agregado) {
+                        setDetalleState(() {
+                          productoAgregado = true;
+                        });
+
+                        ScaffoldMessenger.of(rootContext).showSnackBar(
+                          const SnackBar(
+                            content: Text("Producto agregado al carrito"),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(rootContext).showSnackBar(
+                          const SnackBar(
+                            backgroundColor: Colors.redAccent,
+                            content: Text(
+                              "La cantidad supera el stock disponible",
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                }
+              : null,
+          icon: const Icon(Icons.shopping_cart, color: Colors.white),
+          label: const Text(
+            "Seleccionar y agregar",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+                ),
+              ),
+            ],
+          );
+        },
+      );},);
+     
+
+
+      
+    },
+  );
+}
+
+Widget productosRelacionadosPerfil({
+  required String productoActualId,
+  required String? categoriaId,
+}) {
+  if (categoriaId == null) return const SizedBox();
+
+  return StreamBuilder<QuerySnapshot>(
+    stream: productosRef
+        .where('activo', isEqualTo: true)
+        .where('categoriaId', isEqualTo: categoriaId)
+        .limit(8)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      final relacionados = snapshot.data!.docs
+          .where((doc) => doc.id != productoActualId)
+          .toList();
+
+      if (relacionados.isEmpty) return const SizedBox();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 26),
+
+          const Text(
+            "También te puede interesar",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: relacionados.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 14,
+              childAspectRatio: 0.70,
+            ),
+            itemBuilder: (context, index) {
+              final doc = relacionados[index];
+              final data = doc.data() as Map<String, dynamic>;
+
+              final imagenUrl = data['imagenUrl'] ?? '';
+              final imagenes = List<String>.from(data['imagenes'] ?? []);
+              final imagenMostrar =
+                  imagenes.isNotEmpty ? imagenes.first : imagenUrl;
+
+              final stock =
+                  int.tryParse(data['stock'].toString()) ?? 0;
+
+              final precio =
+                  double.tryParse(data['precio'].toString()) ?? 0;
+
+              return GestureDetector(
+                onTap: () {
+                  mostrarDetalleProductoPerfil(
+                    productoId: doc.id,
+                    producto: {
+                      ...data,
+                      'productoId': doc.id,
+                    },
+                  );
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.grey.shade200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(18),
+                        ),
+                        child: SizedBox(
+                          height: 110,
+                          width: double.infinity,
+                          child: imagenMostrar.toString().isNotEmpty
+                              ? Container(
+                                  color: Colors.white,
+                                  alignment: Alignment.center,
+                                  child: Image.network(
+                                    imagenMostrar,
+                                    fit: BoxFit.contain,
+                                  ),
+                                )
+                              : Container(
+                                  color: primaryColor.withValues(alpha: 0.10),
+                                  child: Icon(
+                                    Icons.shopping_bag,
+                                    color: primaryColor,
+                                    size: 36,
+                                  ),
+                                ),
+                        ),
+                      ),
+
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(9),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                data['nombre'] ?? 'Producto',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              Text(
+                                "S/ ${precio.toStringAsFixed(2)}",
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              Text(
+                                stock > 0 ? "Disponible" : "Sin stock",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: stock > 0
+                                      ? Colors.green
+                                      : Colors.redAccent,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
                           ),
-
-                          Padding(
-                            padding: const EdgeInsets.all(18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  producto['nombre'] ?? 'Producto',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-
-                                Text(
-                                  "S/ ${producto['precio'] ?? 0}",
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 10),
-
-                                Text(
-                                  stock > 0
-                                      ? "Stock disponible: $stock"
-                                      : "Sin stock",
-                                  style: TextStyle(
-                                    color:
-                                        stock > 0 ? Colors.green : Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                Text(
-                                  producto['descripcion'] ?? '',
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    height: 1.4,
-                                  ),
-                                ),
-
-                                if (colores.isNotEmpty) ...[
-                                  const SizedBox(height: 22),
-                                  const Text(
-                                    "Selecciona un color",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Wrap(
-                                    spacing: 10,
-                                    runSpacing: 10,
-                                    children: colores.map((color) {
-                                      final seleccionado =
-                                          colorSeleccionado == color;
-
-                                      return GestureDetector(
-                                        onTap: () {
-                                          setModalState(() {
-                                            colorSeleccionado = color;
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.all(3),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: seleccionado
-                                                  ? primaryColor
-                                                  : Colors.grey.shade300,
-                                              width: seleccionado ? 3 : 1,
-                                            ),
-                                          ),
-                                          child: CircleAvatar(
-                                            radius: 18,
-                                            backgroundColor:
-                                                obtenerColor(color),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
-
-                                if (tallas.isNotEmpty) ...[
-                                  const SizedBox(height: 22),
-                                  const Text(
-                                    "Selecciona una talla",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: tallas.map((talla) {
-                                      final seleccionado =
-                                          tallaSeleccionada == talla;
-
-                                      return ChoiceChip(
-                                        label: Text(talla),
-                                        selected: seleccionado,
-                                        selectedColor:
-                                            primaryColor.withOpacity(0.18),
-                                        labelStyle: TextStyle(
-                                          color: seleccionado
-                                              ? primaryColor
-                                              : Colors.black,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        onSelected: (_) {
-                                          setModalState(() {
-                                            tallaSeleccionada = talla;
-                                          });
-                                        },
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
-
-                                const SizedBox(height: 24),
-
-                                const Text(
-                                  "Cantidad",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 10),
-
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      onPressed: cantidad > 1
-                                          ? () {
-                                              setModalState(() {
-                                                cantidad--;
-                                              });
-                                            }
-                                          : null,
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                      ),
-                                    ),
-                                    Text(
-                                      "$cantidad",
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: cantidad < stock
-                                          ? () {
-                                              setModalState(() {
-                                                cantidad++;
-                                              });
-                                            }
-                                          : null,
-                                      icon: const Icon(
-                                        Icons.add_circle_outline,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                if (!agregadoCorrectamente)
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 52,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryColor,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                        ),
-                                      ),
-                                      onPressed: stock > 0
-                                          ? () {
-                                              if (colores.isNotEmpty &&
-                                                  colorSeleccionado == null) {
-                                                mostrarMensajeModal(
-                                                  mensaje: "Selecciona un color",
-                                                  color: Colors.orange,
-                                                  icono: Icons.color_lens,
-                                                );
-                                                return;
-                                              }
-
-                                              if (tallas.isNotEmpty &&
-                                                  tallaSeleccionada == null) {
-                                                mostrarMensajeModal(
-                                                  mensaje:
-                                                      "Selecciona una talla",
-                                                  color: Colors.redAccent,
-                                                  icono: Icons.straighten,
-                                                );
-                                                return;
-                                              }
-
-                                              final precio = double.tryParse(
-                                                    producto['precio']
-                                                        .toString(),
-                                                  ) ??
-                                                  0;
-
-                                              final productoCarrito = {
-                                                ...producto,
-                                                'productoId': productoId,
-                                                'colorSeleccionado':
-                                                    colorSeleccionado,
-                                                'tallaSeleccionada':
-                                                    tallaSeleccionada,
-                                                'cantidad': cantidad,
-                                                'subtotal': cantidad * precio,
-                                              };
-
-                                              final agregado =
-                                                  agregarAlCarritoDesdePerfil(
-                                                productoCarrito,
-                                                productoId,
-                                              );
-
-                                              if (agregado) {
-                                                setModalState(() {
-                                                  agregadoCorrectamente = true;
-                                                });
-
-                                                mostrarMensajeModal(
-                                                  mensaje:
-                                                      "Producto agregado al carrito",
-                                                  color: Colors.green,
-                                                  icono: Icons.check_circle,
-                                                );
-                                              } else {
-                                                mostrarMensajeModal(
-                                                  mensaje:
-                                                      "La cantidad supera el stock disponible",
-                                                  color: Colors.redAccent,
-                                                  icono: Icons
-                                                      .warning_amber_rounded,
-                                                );
-                                              }
-                                            }
-                                          : null,
-                                      icon: const Icon(
-                                        Icons.shopping_cart,
-                                        color: Colors.white,
-                                      ),
-                                      label: const Text(
-                                        "Agregar al carrito",
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                if (agregadoCorrectamente)
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 52,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                        ),
-                                      ),
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        irAlCarrito();
-                                      },
-                                      icon: const Icon(
-                                        Icons.shopping_cart_checkout,
-                                        color: Colors.white,
-                                      ),
-                                      label: const Text(
-                                        "Ir al carrito",
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                productosRelacionadosPerfil(
-                                  productoActualId: productoId,
-                                  categoriaId: producto['categoriaId'],
-                                ),
-
-                                const SizedBox(height: 30),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-
-                if (mensajeModal != null)
-                  Positioned(
-                    top: 18,
-                    left: 18,
-                    right: 18,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorMensajeModal,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.25),
-                              blurRadius: 12,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(iconoMensajeModal, color: Colors.white),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                mensajeModal!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget productosRelacionadosPerfil({
-    required String productoActualId,
-    required String? categoriaId,
-  }) {
-    if (categoriaId == null) return const SizedBox();
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: productosRef
-          .where('activo', isEqualTo: true)
-          .where('categoriaId', isEqualTo: categoriaId)
-          .limit(8)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const SizedBox(
-            height: 120,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final relacionados = snapshot.data!.docs
-            .where((doc) => doc.id != productoActualId)
-            .toList();
-
-        if (relacionados.isEmpty) return const SizedBox();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 26),
-            const Text(
-              "También te puede interesar",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: relacionados.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 14,
-                childAspectRatio: 0.70,
-              ),
-              itemBuilder: (context, index) {
-                final doc = relacionados[index];
-                final data = doc.data() as Map<String, dynamic>;
-
-                final imagenUrl = data['imagenUrl'] ?? '';
-                final imagenes = List<String>.from(data['imagenes'] ?? []);
-                final imagenMostrar =
-                    imagenes.isNotEmpty ? imagenes.first : imagenUrl;
-
-                final stock = int.tryParse(data['stock'].toString()) ?? 0;
-                final precio = double.tryParse(data['precio'].toString()) ?? 0;
-
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-
-                    Future.delayed(const Duration(milliseconds: 250), () {
-                      mostrarDetalleProductoPerfil(
-                        productoId: doc.id,
-                        producto: {
-                          ...data,
-                          'productoId': doc.id,
-                        },
-                      );
-                    });
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(18),
-                          ),
-                          child: SizedBox(
-                            height: 110,
-                            width: double.infinity,
-                            child: imagenMostrar.toString().isNotEmpty
-                                ? Image.network(
-                                    imagenMostrar,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Container(
-                                    color: primaryColor.withOpacity(0.10),
-                                    child: Icon(
-                                      Icons.shopping_bag,
-                                      color: primaryColor,
-                                      size: 36,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(9),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  data['nombre'] ?? 'Producto',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "S/ ${precio.toStringAsFixed(2)}",
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  stock > 0 ? "Disponible" : "Sin stock",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: stock > 0
-                                        ? Colors.green
-                                        : Colors.redAccent,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+              );
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
   Widget accesosRapidosPerfil() {
     return SizedBox(
@@ -874,7 +722,7 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -884,7 +732,7 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircleAvatar(
-              backgroundColor: primaryColor.withOpacity(0.12),
+              backgroundColor: primaryColor.withValues(alpha: 0.12),
               child: Icon(icono, color: primaryColor),
             ),
             const SizedBox(height: 10),
@@ -959,7 +807,7 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
+                      color: Colors.black.withValues(alpha: 0.07),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
@@ -978,12 +826,16 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
                             height: 130,
                             width: double.infinity,
                             child: imagenMostrar.toString().isNotEmpty
-                                ? Image.network(
-                                    imagenMostrar,
-                                    fit: BoxFit.cover,
-                                  )
+                                ? Container(
+  color: Colors.white,
+  alignment: Alignment.center,
+  child: Image.network(
+    imagenMostrar,
+    fit: BoxFit.contain,
+  ),
+)
                                 : Container(
-                                    color: primaryColor.withOpacity(0.10),
+                                    color: primaryColor.withValues(alpha: 0.10),
                                     child: Icon(
                                       Icons.shopping_bag,
                                       color: primaryColor,
@@ -1101,7 +953,7 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -1230,7 +1082,7 @@ class _PerfilClienteScreenState extends State<PerfilClienteScreen> {
                         },
                         child: CircleAvatar(
                           radius: 28,
-                          backgroundColor: primaryColor.withOpacity(0.15),
+                          backgroundColor: primaryColor.withValues(alpha: 0.15),
                           backgroundImage: fotoUrl != null && fotoUrl != ''
                               ? NetworkImage(fotoUrl)
                               : null,

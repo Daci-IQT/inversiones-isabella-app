@@ -126,7 +126,7 @@ class _AdminReclamosScreenState extends State<AdminReclamosScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -146,7 +146,7 @@ class _AdminReclamosScreenState extends State<AdminReclamosScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -195,7 +195,7 @@ class _AdminReclamosScreenState extends State<AdminReclamosScreen> {
         const SizedBox(height: 12),
 
         DropdownButtonFormField<String>(
-          value: estadoFiltro,
+          initialValue: estadoFiltro,
           isExpanded: true,
           decoration: InputDecoration(
             labelText: "Filtrar por estado",
@@ -355,7 +355,7 @@ class _AdminReclamosScreenState extends State<AdminReclamosScreen> {
                             const SizedBox(height: 18),
 
                             DropdownButtonFormField<String>(
-                              value: estadoTemporal,
+                              initialValue: estadoTemporal,
                               decoration: const InputDecoration(
                                 labelText: "Cambiar estado",
                                 border: OutlineInputBorder(),
@@ -487,7 +487,7 @@ class _AdminReclamosScreenState extends State<AdminReclamosScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.all(14),
         leading: CircleAvatar(
-          backgroundColor: colorTipo(tipo).withOpacity(0.12),
+          backgroundColor: colorTipo(tipo).withValues(alpha: 0.12),
           child: Icon(
             tipo == "sugerencia" ? Icons.lightbulb : Icons.report_problem,
             color: colorTipo(tipo),

@@ -4,6 +4,8 @@ import '../clientes/inicio_cliente_screen.dart';
 import '../clientes/carrito_cliente_screen.dart';
 import '../clientes/perfil_cliente_screen.dart';
 import '../clientes/categorias_cliente_screen.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 /// 🚀 PANTALLA PRINCIPAL CLIENTE
@@ -27,6 +29,39 @@ class _ClientePanelState extends State<ClientePanel> {
   final Color primaryColor = const Color.fromARGB(255, 243, 33, 96);
 
   final List<Map<String, dynamic>> carrito = [];
+  @override
+void initState() {
+  super.initState();
+  cargarCarritoLocal();
+}
+
+Future<void> guardarCarritoLocal() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('carrito_temporal', jsonEncode(carrito));
+}
+
+Future<void> cargarCarritoLocal() async {
+  final prefs = await SharedPreferences.getInstance();
+  final data = prefs.getString('carrito_temporal');
+
+  if (data == null || data.isEmpty) return;
+
+  final List decoded = jsonDecode(data);
+
+  if (!mounted) return;
+
+  setState(() {
+    carrito.clear();
+    carrito.addAll(
+      decoded.map((e) => Map<String, dynamic>.from(e)).toList(),
+    );
+  });
+}
+
+Future<void> limpiarCarritoLocal() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('carrito_temporal');
+}
 
   bool agregarAlCarrito(
     Map<String, dynamic> producto,
@@ -45,11 +80,12 @@ class _ClientePanelState extends State<ClientePanel> {
     final String? tallaSeleccionada = producto['tallaSeleccionada'];
 
     final indexProducto = carrito.indexWhere(
-      (item) =>
-          item['productoId'] == productoId &&
-          item['colorSeleccionado'] == colorSeleccionado &&
-          item['tallaSeleccionada'] == tallaSeleccionada,
-    );
+  (item) =>
+      item['productoId'] == productoId &&
+      item['colorSeleccionado'] == colorSeleccionado &&
+      item['tallaSeleccionada'] == tallaSeleccionada &&
+      item['stockKey'] == producto['stockKey'],
+);
 
     bool agregado = false;
 
@@ -88,11 +124,14 @@ class _ClientePanelState extends State<ClientePanel> {
           'categoriaNombre': producto['categoriaNombre'],
           'colorSeleccionado': colorSeleccionado,
           'tallaSeleccionada': tallaSeleccionada,
+          'stockKey': producto['stockKey'],
         });
 
         agregado = true;
       }
     });
+
+    guardarCarritoLocal();
 
     return agregado;
   }
@@ -114,9 +153,10 @@ class _ClientePanelState extends State<ClientePanel> {
     productoDetallePendiente = null;
   }
 
-  void actualizarCarrito() {
-    setState(() {});
-  }
+void actualizarCarrito() {
+  setState(() {});
+  guardarCarritoLocal();
+}
 
   int cantidadTotalCarrito() {
     int total = 0;

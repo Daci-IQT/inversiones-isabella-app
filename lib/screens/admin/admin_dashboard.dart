@@ -10,10 +10,15 @@ import 'admin_reportes_screen.dart';
 import 'admin_configuracion_screen.dart';
 import 'admin_categorias_screen.dart';
 import 'dashboard_screen.dart';
+import 'admin_repartidores_screen.dart';
+import 'admin_historial_inventario_screen.dart';
+import 'mesa_ayuda_admin_screen.dart';
 
-///PANTALLA PRINCIPAL ADMIN - DISEÑO MODERNO
+///PANTALLA PRINCIPAL ADMIN 
 ////////////////////////////////////////////////////////
 class AdminDashboard extends StatefulWidget {
+  const AdminDashboard({super.key});
+
   @override
   _AdminDashboardState createState() => _AdminDashboardState();
 }
@@ -189,12 +194,16 @@ User? get usuarioActual => auth.currentUser;
                 children: [
                   menuItem("Dashboard", Icons.dashboard, "dashboard"),
                   menuItem("Productos", Icons.inventory_2, "productos"),
+                  menuItem("Historial Inventario", Icons.history, "historial_inventario"),
                   menuItem("Categorías", Icons.category, "categorias"),
                   menuItem("Pedidos", Icons.shopping_cart, "pedidos"),
                   menuItem("Clientes", Icons.people, "clientes"),
                   menuItem("Reclamos", Icons.report_problem, "reclamos"),
+                  menuItem("Mesa de Ayuda", Icons.support_agent, "mesa_ayuda"),
                   menuItem("Reportes", Icons.bar_chart, "reportes"),
-                  menuItem("Configuración", Icons.settings, "config"),
+                  menuItem("Repartidores", Icons.delivery_dining,"repartidores"),
+                  menuItem("Configuración", Icons.settings, "config")
+                 
                 ],
               ),
             ),
@@ -225,7 +234,7 @@ User? get usuarioActual => auth.currentUser;
           borderRadius: BorderRadius.circular(14),
         ),
         selected: activo,
-        selectedTileColor: colorPrincipal.withOpacity(0.12),
+        selectedTileColor: colorPrincipal.withValues(alpha: 0.12),
         leading: Icon(
           icon,
           color: activo ? colorPrincipal : Colors.grey[700],
@@ -259,6 +268,8 @@ User? get usuarioActual => auth.currentUser;
         return DashboardScreen();
       case "productos":
         return const AdminProductosScreen();
+      case "historial_inventario":
+        return const AdminHistorialInventarioScreen();
       case "pedidos":
         return const AdminPedidosScreen();
       case "clientes":
@@ -269,8 +280,12 @@ User? get usuarioActual => auth.currentUser;
         return const AdminReportesScreen();
       case "config":
         return const AdminConfiguracionScreen();
+      case "mesa_ayuda":
+        return const MesaAyudaAdminScreen();
       case "categorias":
         return AdminCategoriasScreen();
+      case "repartidores":
+        return const AdminRepartidoresScreen();
       default:
         return DashboardScreen();
     }

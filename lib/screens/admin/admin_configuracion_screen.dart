@@ -212,7 +212,7 @@ Future<void> actualizarDatosAdmin() async {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: color.withOpacity(0.12),
+            backgroundColor: color.withValues(alpha: 0.12),
             child: Icon(icono, color: color),
           ),
           const SizedBox(width: 14),
@@ -364,7 +364,7 @@ Future<void> actualizarDatosAdmin() async {
                             child: CircleAvatar(
                               radius: 52,
                               backgroundColor:
-                                  primaryColor.withOpacity(0.12),
+                                  primaryColor.withValues(alpha: 0.12),
                               backgroundImage: logoSeleccionado != null
                                   ? FileImage(logoSeleccionado!)
                                   : logoActualUrl.isNotEmpty

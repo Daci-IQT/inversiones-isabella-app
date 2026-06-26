@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,11 +10,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-
-
-/// PANTALLA PEDIDOS CLIENTE
-////////////////////////////////////////////
 
 class PedidosClienteScreen extends StatefulWidget {
   const PedidosClienteScreen({super.key});
@@ -28,13 +24,14 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
   String filtroSeleccionado = "todos";
 
   final List<String> filtros = [
-  "todos",
-  "pendiente",
-  "confirmado",
-  "enviado",
-  "entregado",
-  "cancelado",
-];
+    "todos",
+    "pendiente",
+    "en_proceso",
+    "en_camino",
+    "entregado",
+    "cancelado",
+    "incidencia",
+  ];
 
   String formatearFecha(dynamic timestamp) {
     if (timestamp == null) return "Sin fecha";
@@ -50,17 +47,39 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
     }
   }
 
+  String mostrarEstado(String estado) {
+    switch (estado.toLowerCase()) {
+      case "pendiente":
+        return "Pendiente";
+      case "en_proceso":
+        return "En proceso";
+      case "en_camino":
+        return "En camino";
+      case "entregado":
+        return "Entregado";
+      case "cancelado":
+        return "Cancelado";
+      case "incidencia":
+        return "Incidencia";
+      default:
+        return estado;
+    }
+  }
+
   Color colorEstado(String estado) {
     switch (estado.toLowerCase()) {
-      case "confirmado":
-        return Colors.blue;
-      case "enviado":
-      case "en proceso":
+      case "pendiente":
         return Colors.orange;
+      case "en_proceso":
+        return Colors.blue;
+      case "en_camino":
+        return Colors.deepOrange;
       case "entregado":
         return Colors.green;
       case "cancelado":
         return Colors.red;
+      case "incidencia":
+        return Colors.redAccent;
       default:
         return primaryColor;
     }
@@ -68,15 +87,18 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
 
   IconData iconoEstado(String estado) {
     switch (estado.toLowerCase()) {
-      case "confirmado":
-        return Icons.verified_outlined;
-      case "enviado":
-      case "en proceso":
+      case "pendiente":
+        return Icons.pending_actions_outlined;
+      case "en_proceso":
+        return Icons.inventory_2_outlined;
+      case "en_camino":
         return Icons.local_shipping_outlined;
       case "entregado":
         return Icons.check_circle_outline;
       case "cancelado":
         return Icons.cancel_outlined;
+      case "incidencia":
+        return Icons.report_problem_outlined;
       default:
         return Icons.pending_actions_outlined;
     }
@@ -86,16 +108,18 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
     switch (filtro) {
       case "todos":
         return "Todos";
-      case "pendiente": 
-      return "Pendientes";
-      case "confirmado":
-        return "Confirmados";
-      case "enviado":
-        return "Enviados";
+      case "pendiente":
+        return "Pendientes";
+      case "en_proceso":
+        return "En proceso";
+      case "en_camino":
+        return "En camino";
       case "entregado":
         return "Entregados";
       case "cancelado":
         return "Cancelados";
+      case "incidencia":
+        return "Incidencias";
       default:
         return filtro;
     }
@@ -134,6 +158,11 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
     required Map<String, dynamic> data,
     required List<Map<String, dynamic>> productos,
   }) {
+    final estado = (data['estado'] ?? 'pendiente').toString();
+    final metodoEntrega = data['metodoEntrega'] ?? 'delivery';
+    final repartidorNombre = data['repartidorNombre'] ?? '';
+    final fotoEntregaUrl = data['fotoEntregaUrl'] ?? '';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -143,8 +172,8 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
       ),
       builder: (_) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.82,
-          maxChildSize: 0.95,
+          initialChildSize: 0.84,
+          maxChildSize: 0.96,
           minChildSize: 0.55,
           expand: false,
           builder: (context, scrollController) {
@@ -172,17 +201,72 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
 
-                Text(
-                  "Estado: ${data['estado'] ?? 'pendiente'}",
-                  style: TextStyle(
-                    color: colorEstado(data['estado'] ?? 'pendiente'),
-                    fontWeight: FontWeight.bold,
+                estadoItem(
+                  "Estado del pedido",
+                  mostrarEstado(estado),
+                  colorEstado(estado),
+                ),
+
+                const SizedBox(height: 12),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      itemDetalle(
+                        "Entrega",
+                        metodoEntrega == 'delivery'
+                            ? "Delivery"
+                            : "Recojo en tienda",
+                      ),
+                      itemDetalle(
+                        "Dirección",
+                        data['clienteDireccion'] ?? 'Sin dirección',
+                      ),
+                      if (repartidorNombre.toString().isNotEmpty)
+                        itemDetalle("Repartidor", repartidorNombre),
+                      itemDetalle(
+                        "Estado entrega",
+                        mostrarEstado(data['estadoEntrega'] ?? estado),
+                      ),
+                    ],
                   ),
                 ),
 
+                if (fotoEntregaUrl.toString().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text(
+                    "Evidencia de entrega",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      fotoEntregaUrl,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 18),
+
+                const Text(
+                  "Productos",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                ),
+
+                const SizedBox(height: 10),
 
                 ...productos.map((producto) {
                   final imagenUrl = producto['imagenUrl'] ?? '';
@@ -214,7 +298,7 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
                               : Container(
                                   width: 70,
                                   height: 70,
-                                  color: primaryColor.withOpacity(0.10),
+                                  color: primaryColor.withValues(alpha: 0.10),
                                   child: Icon(
                                     Icons.shopping_bag,
                                     color: primaryColor,
@@ -280,13 +364,27 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
                       ],
                     ),
                   );
-                }).toList(),
+                }),
 
                 const SizedBox(height: 12),
 
                 resumenPedido(data),
 
-                const SizedBox(height: 25),
+const SizedBox(height: 20),
+
+const Text(
+  "Historial del pedido",
+  style: TextStyle(
+    fontSize: 17,
+    fontWeight: FontWeight.bold,
+  ),
+),
+
+const SizedBox(height: 12),
+
+historialPedidoWidget(pedidoId),
+
+const SizedBox(height: 25),
               ],
             );
           },
@@ -295,11 +393,149 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
     );
   }
 
+Widget historialPedidoWidget(String pedidoId) {
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('pedidos')
+        .doc(pedidoId)
+        .collection('historial')
+        .orderBy('fecha', descending: false)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Text("Error al cargar historial");
+      }
+
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      final historial = snapshot.data!.docs;
+
+      if (historial.isEmpty) {
+        return const Text("Aún no hay historial del pedido");
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: historial.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+
+          final accion = data['accion'] ?? 'Movimiento';
+          final descripcion = data['descripcion'] ?? '';
+          final usuarioNombre = data['usuarioNombre'] ?? '';
+          final fecha = data['fecha'];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Container(
+                      width: 2,
+                      height: 48,
+                      color: Colors.grey.shade300,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F7F7),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          accion,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (descripcion.toString().isNotEmpty)
+                          Text(
+                            descripcion,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 13,
+                            ),
+                          ),
+                        if (usuarioNombre.toString().isNotEmpty)
+                          Text(
+                            "Por: $usuarioNombre",
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        Text(
+                          formatearFecha(fecha),
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    },
+  );
+}
+  Widget itemDetalle(String titulo, String valor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 105,
+            child: Text(
+              "$titulo:",
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              valor.toString().isEmpty ? "No registrado" : valor,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void abrirBoletaPedido({
     required String pedidoId,
     required Map<String, dynamic> data,
     required List<Map<String, dynamic>> productos,
   }) {
+    final fotoEntregaUrl = data['fotoEntregaUrl'] ?? '';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -397,6 +633,45 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
                       const Divider(height: 30),
 
                       const Text(
+                        "Detalle de entrega",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      itemBoleta(
+                        "Entrega",
+                        data['metodoEntrega'] == 'delivery'
+                            ? "Delivery"
+                            : "Recojo en tienda",
+                      ),
+                      itemBoleta(
+                        "Estado",
+                        mostrarEstado(data['estadoEntrega'] ?? data['estado']),
+                      ),
+                      itemBoleta(
+                        "Repartidor",
+                        data['repartidorNombre'] ?? '',
+                      ),
+                      itemBoleta(
+                        "Fecha entrega",
+                        formatearFecha(data['fechaEntrega']),
+                      ),
+
+                      if (fotoEntregaUrl.toString().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            fotoEntregaUrl,
+                            height: 170,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ],
+
+                      const Divider(height: 30),
+
+                      const Text(
                         "Detalle de productos",
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
@@ -406,7 +681,6 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
                         final nombre = producto['nombre'] ?? 'Producto';
                         final cantidad =
                             int.tryParse(producto['cantidad'].toString()) ?? 1;
-                        
                         final subtotal = obtenerSubtotal(producto);
 
                         return Container(
@@ -430,101 +704,132 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
 
                       const Divider(height: 30),
 
                       resumenBoleta(data, productos),
 
                       const SizedBox(height: 18),
+                      botonCalificarEntrega(
+  pedidoId: pedidoId,
+  pedido: data,
+),
+
+const SizedBox(height: 18),
+                      const Text(
+  "Historial del pedido",
+  style: TextStyle(
+    fontSize: 17,
+    fontWeight: FontWeight.bold,
+  ),
+),
+
+const SizedBox(height: 12),
+
+historialPedidoWidget(pedidoId),
+
+const SizedBox(height: 18),
 
                       Column(
-  children: [
-    SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        onPressed: () {
-          descargarBoletaPDF(
-            pedidoId: pedidoId,
-            data: data,
-            productos: productos,
-          );
-        },
-        icon: const Icon(Icons.download, color: Colors.white),
-        label: const Text(
-          "Descargar boleta PDF",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-    ),
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: () {
+                                descargarBoletaPDF(
+                                  pedidoId: pedidoId,
+                                  data: data,
+                                  productos: productos,
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.download,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                "Descargar boleta PDF",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
 
-    const SizedBox(height: 10),
+                          const SizedBox(height: 10),
 
-    SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        onPressed: () {
-          compartirBoletaPDF(
-            pedidoId: pedidoId,
-            data: data,
-            productos: productos,
-          );
-        },
-        icon: const Icon(Icons.share, color: Colors.white),
-        label: const Text(
-          "Compartir PDF",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-    ),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: () {
+                                compartirBoletaPDF(
+                                  pedidoId: pedidoId,
+                                  data: data,
+                                  productos: productos,
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.share,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                "Compartir PDF",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
 
-    const SizedBox(height: 10),
+                          const SizedBox(height: 10),
 
-    Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              compartirPorWhatsApp(
-                pedidoId: pedidoId,
-                data: data,
-              );
-            },
-            icon: const Icon(Icons.chat),
-            label: const Text("WhatsApp"),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              enviarBoletaPorCorreo(
-                pedidoId: pedidoId,
-                data: data,
-              );
-            },
-            icon: const Icon(Icons.email),
-            label: const Text("Correo"),
-          ),
-        ),
-      ],
-    ),
-  ],
-),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    compartirPorWhatsApp(
+                                      pedidoId: pedidoId,
+                                      data: data,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.chat),
+                                  label: const Text("WhatsApp"),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    enviarBoletaPorCorreo(
+                                      pedidoId: pedidoId,
+                                      data: data,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.email),
+                                  label: const Text("Correo"),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -537,352 +842,569 @@ class _PedidosClienteScreenState extends State<PedidosClienteScreen> {
       },
     );
   }
+  Future<bool> yaCalificoPedido(String pedidoId) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return true;
 
+  final snapshot = await FirebaseFirestore.instance
+      .collection('calificaciones_repartidores')
+      .where('pedidoId', isEqualTo: pedidoId)
+      .where('clienteId', isEqualTo: user.uid)
+      .get();
 
-
-pw.Widget filaPdf(String titulo, String valor, {bool bold = false}) {
-  return pw.Padding(
-    padding: const pw.EdgeInsets.symmetric(vertical: 3),
-    child: pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text(titulo),
-        pw.Text(
-          valor,
-          style: pw.TextStyle(
-            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-          ),
-        ),
-      ],
-    ),
-  );
+  return snapshot.docs.isNotEmpty;
 }
 
-Future<File> generarBoletaPDF({
+Future<void> guardarCalificacionRepartidor({
   required String pedidoId,
-  required Map<String, dynamic> data,
-  required List<Map<String, dynamic>> productos,
+  required Map<String, dynamic> pedido,
+  required int calificacion,
+  required String comentario,
 }) async {
-  final pdf = pw.Document();
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-  const empresaNombre = "INVERSIONES ISABELLA";
-  const empresaRuc = "RUC: 00000000000";
-  const empresaDireccion = "Iquitos, Loreto, Perú";
-  const empresaTelefono = "Teléfono: 999 999 999";
+  await FirebaseFirestore.instance.collection('calificaciones_repartidores').add({
+    'pedidoId': pedidoId,
+    'clienteId': user.uid,
+    'clienteCorreo': user.email ?? '',
+    'repartidorId': pedido['repartidorId'] ?? '',
+    'repartidorNombre': pedido['repartidorNombre'] ?? '',
+    'calificacion': calificacion,
+    'comentario': comentario,
+    'fecha': FieldValue.serverTimestamp(),
+  });
 
-  final codigoPedido = pedidoId.substring(0, 8).toUpperCase();
-  final qrTexto =
-      "Empresa: $empresaNombre\nPedido: $codigoPedido\nCliente: ${data['clienteNombre'] ?? ''}\nTotal: S/ ${data['total'] ?? 0}";
+  await FirebaseFirestore.instance
+      .collection('pedidos')
+      .doc(pedidoId)
+      .update({
+    'calificacionEntrega': calificacion,
+    'comentarioEntrega': comentario,
+    'fechaCalificacionEntrega': FieldValue.serverTimestamp(),
+  });
 
-  double subtotal = 0;
+  if (!mounted) return;
 
-  for (final p in productos) {
-    final cantidad = int.tryParse(p['cantidad'].toString()) ?? 1;
-    final precio = double.tryParse(p['precio'].toString()) ?? 0;
-    subtotal += cantidad * precio;
-  }
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Gracias por calificar la entrega")),
+  );
 
-  final igv = subtotal * 0.18;
-  final total = double.tryParse(data['total'].toString()) ?? subtotal;
+  setState(() {});
+}
+void mostrarDialogoCalificacion({
+  required String pedidoId,
+  required Map<String, dynamic> pedido,
+}) {
+  int calificacion = 5;
+  final comentarioController = TextEditingController();
 
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(24),
-      build: (context) => [
-        pw.Container(
-          padding: const pw.EdgeInsets.all(14),
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfColors.black),
-          ),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Container(
-                width: 70,
-                height: 70,
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.grey),
-                ),
-                child: pw.Center(
-                  child: pw.Text(
-                    "LOGO",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                  ),
-                ),
-              ),
-              pw.SizedBox(width: 14),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      empresaNombre,
-                      style: pw.TextStyle(
-                        fontSize: 20,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.Text(empresaRuc),
-                    pw.Text(empresaDireccion),
-                    pw.Text(empresaTelefono),
-                  ],
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.black),
-                ),
-                child: pw.Column(
-                  children: [
-                    pw.Text(
-                      "BOLETA DE VENTA",
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text("B001-$codigoPedido"),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        pw.SizedBox(height: 20),
-
-        pw.Text(
-          "DATOS DEL CLIENTE",
-          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-        ),
-        pw.Divider(),
-        pw.Text("Cliente: ${data['clienteNombre'] ?? ''}"),
-        pw.Text("DNI: ${data['clienteDni'] ?? 'No registrado'}"),
-        pw.Text("Correo: ${data['clienteCorreo'] ?? ''}"),
-        pw.Text("Celular: ${data['clienteCelular'] ?? ''}"),
-        pw.Text("Dirección: ${data['clienteDireccion'] ?? ''}"),
-
-        pw.SizedBox(height: 20),
-
-        pw.Text(
-          "DETALLE DEL PEDIDO",
-          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-        ),
-        pw.SizedBox(height: 8),
-
-        pw.Table(
-          border: pw.TableBorder.all(color: PdfColors.grey),
-          columnWidths: {
-            0: const pw.FlexColumnWidth(4),
-            1: const pw.FlexColumnWidth(1),
-            2: const pw.FlexColumnWidth(1.5),
-            3: const pw.FlexColumnWidth(1.5),
-          },
-          children: [
-            pw.TableRow(
-              decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+  showDialog(
+    context: context,
+    builder: (_) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return AlertDialog(
+            title: const Text("Calificar entrega"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                pw.Padding(
-                  padding: const pw.EdgeInsets.all(6),
-                  child: pw.Text("Producto"),
+                const Text("¿Cómo fue la entrega de tu pedido?"),
+                const SizedBox(height: 12),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final estrella = index + 1;
+
+                    return IconButton(
+                      onPressed: () {
+                        setModalState(() {
+                          calificacion = estrella;
+                        });
+                      },
+                      icon: Icon(
+                        estrella <= calificacion
+                            ? Icons.star
+                            : Icons.star_border,
+                        color: Colors.amber,
+                        size: 32,
+                      ),
+                    );
+                  }),
                 ),
-                pw.Padding(
-                  padding: const pw.EdgeInsets.all(6),
-                  child: pw.Text("Cant."),
-                ),
-                pw.Padding(
-                  padding: const pw.EdgeInsets.all(6),
-                  child: pw.Text("Precio"),
-                ),
-                pw.Padding(
-                  padding: const pw.EdgeInsets.all(6),
-                  child: pw.Text("Subtotal"),
+
+                TextField(
+                  controller: comentarioController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: "Comentario opcional",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ],
             ),
-            ...productos.map((p) {
-              final cantidad = int.tryParse(p['cantidad'].toString()) ?? 1;
-              final precio = double.tryParse(p['precio'].toString()) ?? 0;
-              final sub = cantidad * precio;
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                onPressed: () async {
+                  Navigator.pop(context);
 
-              final detalleExtra =
-                  "${p['colorSeleccionado'] != null ? ' Color: ${p['colorSeleccionado']}' : ''}"
-                  "${p['tallaSeleccionada'] != null ? ' Talla: ${p['tallaSeleccionada']}' : ''}";
+                  await guardarCalificacionRepartidor(
+                    pedidoId: pedidoId,
+                    pedido: pedido,
+                    calificacion: calificacion,
+                    comentario: comentarioController.text.trim(),
+                  );
+                },
+                child: const Text(
+                  "Enviar",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+Widget botonCalificarEntrega({
+  required String pedidoId,
+  required Map<String, dynamic> pedido,
+}) {
+  final estado = (pedido['estado'] ?? '').toString();
+  final repartidorId = (pedido['repartidorId'] ?? '').toString();
 
-              return pw.TableRow(
+  if (estado != 'entregado' || repartidorId.isEmpty) {
+    return const SizedBox();
+  }
+
+  return FutureBuilder<bool>(
+    future: yaCalificoPedido(pedidoId),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return const SizedBox();
+
+      final yaCalifico = snapshot.data ?? true;
+
+      if (yaCalifico) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Text(
+            "Entrega calificada",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.orange,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      }
+
+      return SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.amber,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          onPressed: () {
+            mostrarDialogoCalificacion(
+              pedidoId: pedidoId,
+              pedido: pedido,
+            );
+          },
+          icon: const Icon(Icons.star, color: Colors.white),
+          label: const Text(
+            "Calificar entrega",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+  pw.Widget filaPdf(String titulo, String valor, {bool bold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(titulo),
+          pw.Text(
+            valor,
+            style: pw.TextStyle(
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<File> generarBoletaPDF({
+    required String pedidoId,
+    required Map<String, dynamic> data,
+    required List<Map<String, dynamic>> productos,
+  }) async {
+    final pdf = pw.Document();
+
+    const empresaNombre = "INVERSIONES ISABELLA";
+    const empresaRuc = "RUC: 00000000000";
+    const empresaDireccion = "Iquitos, Loreto, Perú";
+    const empresaTelefono = "Teléfono: 999 999 999";
+
+    final codigoPedido = pedidoId.substring(0, 8).toUpperCase();
+    final qrTexto =
+        "Empresa: $empresaNombre\nPedido: $codigoPedido\nCliente: ${data['clienteNombre'] ?? ''}\nTotal: S/ ${data['total'] ?? 0}";
+
+    double subtotal = 0;
+
+    for (final p in productos) {
+      final cantidad = int.tryParse(p['cantidad'].toString()) ?? 1;
+      final precio = double.tryParse(p['precio'].toString()) ?? 0;
+      subtotal += cantidad * precio;
+    }
+
+    final igv = subtotal * 0.18;
+    final total = double.tryParse(data['total'].toString()) ?? subtotal;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) => [
+          pw.Container(
+            padding: const pw.EdgeInsets.all(14),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Container(
+                  width: 70,
+                  height: 70,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey),
+                  ),
+                  child: pw.Center(
+                    child: pw.Text(
+                      "LOGO",
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(width: 14),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        empresaNombre,
+                        style: pw.TextStyle(
+                          fontSize: 20,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(empresaRuc),
+                      pw.Text(empresaDireccion),
+                      pw.Text(empresaTelefono),
+                    ],
+                  ),
+                ),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.black),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        "BOLETA DE VENTA",
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text("B001-$codigoPedido"),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          pw.SizedBox(height: 20),
+
+          pw.Text(
+            "DATOS DEL CLIENTE",
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.Divider(),
+          pw.Text("Cliente: ${data['clienteNombre'] ?? ''}"),
+          pw.Text("DNI: ${data['clienteDni'] ?? 'No registrado'}"),
+          pw.Text("Correo: ${data['clienteCorreo'] ?? ''}"),
+          pw.Text("Celular: ${data['clienteCelular'] ?? ''}"),
+          pw.Text("Dirección: ${data['clienteDireccion'] ?? ''}"),
+
+          pw.SizedBox(height: 20),
+
+          pw.Text(
+            "DETALLE DEL PEDIDO",
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(4),
+              1: const pw.FlexColumnWidth(1),
+              2: const pw.FlexColumnWidth(1.5),
+              3: const pw.FlexColumnWidth(1.5),
+            },
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                 children: [
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text("${p['nombre'] ?? 'Producto'}$detalleExtra"),
+                    child: pw.Text("Producto"),
                   ),
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text("$cantidad"),
+                    child: pw.Text("Cant."),
                   ),
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text("S/ ${precio.toStringAsFixed(2)}"),
+                    child: pw.Text("Precio"),
                   ),
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text("S/ ${sub.toStringAsFixed(2)}"),
+                    child: pw.Text("Subtotal"),
                   ),
                 ],
-              );
-            }),
-          ],
-        ),
+              ),
+              ...productos.map((p) {
+                final cantidad = int.tryParse(p['cantidad'].toString()) ?? 1;
+                final precio = double.tryParse(p['precio'].toString()) ?? 0;
+                final sub = cantidad * precio;
 
-        pw.SizedBox(height: 20),
+                final detalleExtra =
+                    "${p['colorSeleccionado'] != null ? ' Color: ${p['colorSeleccionado']}' : ''}"
+                    "${p['tallaSeleccionada'] != null ? ' Talla: ${p['tallaSeleccionada']}' : ''}";
 
-        pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Container(
-            width: 230,
+                return pw.TableRow(
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child:
+                          pw.Text("${p['nombre'] ?? 'Producto'}$detalleExtra"),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text("$cantidad"),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text("S/ ${precio.toStringAsFixed(2)}"),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text("S/ ${sub.toStringAsFixed(2)}"),
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
+
+          pw.SizedBox(height: 20),
+
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Container(
+              width: 230,
+              child: pw.Column(
+                children: [
+                  filaPdf("Subtotal", "S/ ${subtotal.toStringAsFixed(2)}"),
+                  filaPdf("IGV 18%", "S/ ${igv.toStringAsFixed(2)}"),
+                  filaPdf("Total", "S/ ${total.toStringAsFixed(2)}",
+                      bold: true),
+                ],
+              ),
+            ),
+          ),
+
+          pw.SizedBox(height: 25),
+
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.BarcodeWidget(
+                barcode: pw.Barcode.qrCode(),
+                data: qrTexto,
+                width: 90,
+                height: 90,
+              ),
+              pw.BarcodeWidget(
+                barcode: pw.Barcode.code128(),
+                data: codigoPedido,
+                width: 180,
+                height: 60,
+              ),
+            ],
+          ),
+
+          pw.SizedBox(height: 35),
+
+          pw.Center(
             child: pw.Column(
               children: [
-                filaPdf("Subtotal", "S/ ${subtotal.toStringAsFixed(2)}"),
-                filaPdf("IGV 18%", "S/ ${igv.toStringAsFixed(2)}"),
-                filaPdf("Total", "S/ ${total.toStringAsFixed(2)}", bold: true),
+                pw.Container(
+                  width: 180,
+                  height: 1,
+                  color: PdfColors.black,
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text("Firma / conformidad"),
               ],
             ),
           ),
-        ),
 
-        pw.SizedBox(height: 25),
+          pw.SizedBox(height: 20),
 
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.BarcodeWidget(
-              barcode: pw.Barcode.qrCode(),
-              data: qrTexto,
-              width: 90,
-              height: 90,
+          pw.Center(
+            child: pw.Text(
+              "Representación impresa de la boleta electrónica",
+              style: const pw.TextStyle(fontSize: 10),
             ),
-            pw.BarcodeWidget(
-              barcode: pw.Barcode.code128(),
-              data: codigoPedido,
-              width: 180,
-              height: 60,
-            ),
-          ],
-        ),
-
-        pw.SizedBox(height: 35),
-
-        pw.Center(
-          child: pw.Column(
-            children: [
-              pw.Container(
-                width: 180,
-                height: 1,
-                color: PdfColors.black,
-              ),
-              pw.SizedBox(height: 5),
-              pw.Text("Firma / conformidad"),
-            ],
           ),
-        ),
+        ],
+      ),
+    );
 
-        pw.SizedBox(height: 20),
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File("${directory.path}/boleta_$codigoPedido.pdf");
 
-        pw.Center(
-          child: pw.Text(
-            "Representación impresa de la boleta electrónica",
-            style: const pw.TextStyle(fontSize: 10),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  final directory = await getApplicationDocumentsDirectory();
-  final file = File("${directory.path}/boleta_$codigoPedido.pdf");
-
-  await file.writeAsBytes(await pdf.save());
-  return file;
-}
-
-Future<void> descargarBoletaPDF({
-  required String pedidoId,
-  required Map<String, dynamic> data,
-  required List<Map<String, dynamic>> productos,
-}) async {
-  final file = await generarBoletaPDF(
-    pedidoId: pedidoId,
-    data: data,
-    productos: productos,
-  );
-
-  await OpenFilex.open(file.path);
-}
-
-Future<void> compartirBoletaPDF({
-  required String pedidoId,
-  required Map<String, dynamic> data,
-  required List<Map<String, dynamic>> productos,
-}) async {
-  final file = await generarBoletaPDF(
-    pedidoId: pedidoId,
-    data: data,
-    productos: productos,
-  );
-
-  await Share.shareXFiles(
-    [XFile(file.path)],
-    text: "Boleta de compra - Inversiones Isabella",
-  );
-}
-
-Future<void> enviarBoletaPorCorreo({
-  required String pedidoId,
-  required Map<String, dynamic> data,
-}) async {
-  final correo = data['clienteCorreo'] ?? '';
-
-  final uri = Uri(
-    scheme: 'mailto',
-    path: correo,
-    query: 'subject=Boleta de compra Inversiones Isabella&body=Adjunto mi boleta de compra.',
-  );
-
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri);
+    await file.writeAsBytes(await pdf.save());
+    return file;
   }
-}
 
-Future<void> compartirPorWhatsApp({
-  required String pedidoId,
-  required Map<String, dynamic> data,
-}) async {
-  final codigo = pedidoId.substring(0, 8).toUpperCase();
-  final mensaje =
-      "Hola, comparto mi boleta de compra de Inversiones Isabella. Pedido: #$codigo";
+  Future<void> descargarBoletaPDF({
+    required String pedidoId,
+    required Map<String, dynamic> data,
+    required List<Map<String, dynamic>> productos,
+  }) async {
+    final file = await generarBoletaPDF(
+      pedidoId: pedidoId,
+      data: data,
+      productos: productos,
+    );
 
-  final uri = Uri.parse(
-    "https://wa.me/?text=${Uri.encodeComponent(mensaje)}",
-  );
-
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await OpenFilex.open(file.path);
   }
-}
+
+  Future<void> compartirBoletaPDF({
+    required String pedidoId,
+    required Map<String, dynamic> data,
+    required List<Map<String, dynamic>> productos,
+  }) async {
+    final file = await generarBoletaPDF(
+      pedidoId: pedidoId,
+      data: data,
+      productos: productos,
+    );
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: "Boleta de compra - Inversiones Isabella",
+    );
+  }
+
+  Future<void> enviarBoletaPorCorreo({
+    required String pedidoId,
+    required Map<String, dynamic> data,
+  }) async {
+    final correo = data['clienteCorreo'] ?? '';
+
+    final uri = Uri(
+      scheme: 'mailto',
+      path: correo,
+      query:
+          'subject=Boleta de compra Inversiones Isabella&body=Adjunto mi boleta de compra.',
+    );
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  Future<void> compartirPorWhatsApp({
+    required String pedidoId,
+    required Map<String, dynamic> data,
+  }) async {
+    final codigo = pedidoId.substring(0, 8).toUpperCase();
+    final mensaje =
+        "Hola, comparto mi boleta de compra de Inversiones Isabella. Pedido: #$codigo";
+
+    final uri = Uri.parse(
+      "https://wa.me/?text=${Uri.encodeComponent(mensaje)}",
+    );
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Widget resumenPedido(Map<String, dynamic> data) {
     final total = double.tryParse(data['total'].toString()) ?? 0;
+    final totalProductos =
+        double.tryParse(data['totalProductos'].toString()) ?? total;
+    final costoDelivery =
+        double.tryParse(data['costoDelivery'].toString()) ?? 0;
+
     final metodoPago = data['metodoPago'] ?? 'No definido';
     final estadoPago = data['estadoPago'] ?? 'pendiente';
+    final metodoEntrega = data['metodoEntrega'] ?? 'delivery';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.08),
+        color: primaryColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         children: [
           filaResumen("Método de pago", metodoPago.toString()),
           filaResumen("Estado de pago", estadoPago.toString()),
+          filaResumen(
+            "Entrega",
+            metodoEntrega == 'delivery' ? "Delivery" : "Recojo en tienda",
+          ),
+          filaResumen(
+            "Subtotal",
+            "S/ ${totalProductos.toStringAsFixed(2)}",
+          ),
+          filaResumen(
+            "Delivery",
+            "S/ ${costoDelivery.toStringAsFixed(2)}",
+          ),
           filaResumen("Total", "S/ ${total.toStringAsFixed(2)}"),
         ],
       ),
@@ -904,7 +1426,10 @@ Future<void> compartirPorWhatsApp({
     return Column(
       children: [
         filaResumen("Subtotal", "S/ ${subtotal.toStringAsFixed(2)}"),
-        filaResumen("Descuento", "S/ 0.00"),
+        filaResumen(
+          "Delivery",
+          "S/ ${(double.tryParse(data['costoDelivery'].toString()) ?? 0).toStringAsFixed(2)}",
+        ),
         filaResumen("Total", "S/ ${total.toStringAsFixed(2)}"),
       ],
     );
@@ -937,7 +1462,7 @@ Future<void> compartirPorWhatsApp({
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 85,
+            width: 95,
             child: Text(
               "$titulo:",
               style: TextStyle(
@@ -948,7 +1473,7 @@ Future<void> compartirPorWhatsApp({
           ),
           Expanded(
             child: Text(
-              valor.isEmpty ? "No registrado" : valor,
+              valor.toString().isEmpty ? "No registrado" : valor,
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
@@ -971,7 +1496,7 @@ Future<void> compartirPorWhatsApp({
         vertical: 12,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -1023,8 +1548,11 @@ Future<void> compartirPorWhatsApp({
 
   Widget pedidoCard(String pedidoId, Map<String, dynamic> data) {
     final estado = data['estado'] ?? 'pendiente';
+    final estadoEntrega = data['estadoEntrega'] ?? estado;
     final estadoPago = data['estadoPago'] ?? 'pendiente';
     final metodoPago = data['metodoPago'] ?? 'No definido';
+    final metodoEntrega = data['metodoEntrega'] ?? 'delivery';
+
     final total = double.tryParse(data['total'].toString()) ?? 0;
     final fecha = data['fechaPedido'];
     final fechaEntrega = data['fechaEntrega'];
@@ -1039,7 +1567,7 @@ Future<void> compartirPorWhatsApp({
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -1052,7 +1580,7 @@ Future<void> compartirPorWhatsApp({
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: colorEstado(estado).withOpacity(0.12),
+                  color: colorEstado(estado).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
@@ -1115,17 +1643,39 @@ Future<void> compartirPorWhatsApp({
             children: [
               Expanded(
                 child: estadoItem(
-                  "Estado",
-                  estado.toString(),
-                  colorEstado(estado),
+                  "Pedido",
+                  mostrarEstado(estado.toString()),
+                  colorEstado(estado.toString()),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: estadoItem(
+                  "Entrega",
+                  mostrarEstado(estadoEntrega.toString()),
+                  colorEstado(estadoEntrega.toString()),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: estadoItem(
                   "Pago",
                   estadoPago.toString(),
                   estadoPago == 'pagado' ? Colors.green : Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: estadoItem(
+                  "Tipo",
+                  metodoEntrega == 'delivery' ? "Delivery" : "Tienda",
+                  metodoEntrega == 'delivery' ? Colors.deepOrange : Colors.blue,
                 ),
               ),
             ],
@@ -1268,10 +1818,6 @@ Future<void> compartirPorWhatsApp({
                     final data = doc.data() as Map<String, dynamic>;
                     final estado =
                         (data['estado'] ?? 'pendiente').toString().toLowerCase();
-
-                    if (filtroSeleccionado == "enviado") {
-                      return estado == "enviado" || estado == "en proceso";
-                    }
 
                     return estado == filtroSeleccionado;
                   }).toList();

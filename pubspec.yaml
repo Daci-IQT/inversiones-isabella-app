@@ -49,11 +49,15 @@ dependencies:
   open_filex: ^4.5.0
   share_plus: ^10.1.4
   url_launcher: ^6.3.1
+  excel: ^4.0.6
+  shared_preferences: ^2.3.3
+  google_sign_in: ^6.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  flutter_launcher_icons: ^0.14.3
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
@@ -72,6 +76,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/isabella_store.png"
+  min_sdk_android: 21
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
